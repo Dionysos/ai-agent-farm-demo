@@ -1,0 +1,158 @@
+# ai agent demo on OpenProject
+# docker compose up -d
+
+name: agents-openproject
+
+# --- common config for agents ---
+x-agent: &agent
+  build: ./agent
+  restart: unless-stopped
+  expose: ["8000"]
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  networks: [agents, egress] # no direct access to OpenProject
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+    interval: 15s
+    timeout: 5s
+    retries: 5
+
+x-agent-env: &agent-env
+  RUN_TIMEOUT_S: 300
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
+
+services:
+
+  # --- OpenProject (image all-in-one : PostgreSQL + memcached) ---
+  openproject:
+    image: openproject/openproject:17.8.0
+    restart: unless-stopped
+    ports:
+      - "${OPENPROJECT_PORT:-8080}:80"
+    environment:
+      OPENPROJECT_SECRET_KEY_BASE: ${OPENPROJECT_SECRET_KEY_BASE}
+      OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-localhost:8080}
+      OPENPROJECT_HTTPS: "false"
+      OPENPROJECT_DEFAULT__LANGUAGE: en
+    volumes:
+      - op_pgdata:/var/openproject/pgdata
+      - op_assets:/var/openproject/assets
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:80/health_checks/default || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    networks: [openproject]
+
+  # --- Orchestrator ---
+  orchestrator:
+    build: ./orchestrator
+    restart: unless-stopped
+    depends_on:
+      openproject: { condition: service_healthy }
+      scout:       { condition: service_healthy }
+      coder:       { condition: service_healthy }
+      reviewer:    { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${ORCHESTRATOR_PORT:-8000}:8000"   # webhook endpoint 
+    environment:
+      # OpenProject
+      OPENPROJECT_URL: http://openproject:80
+      OPENPROJECT_PROJECT: ${OPENPROJECT_PROJECT:-demo-agents}
+      OPENPROJECT_TRACKING_TASK_ID: ${OPENPROJECT_TRACKING_TASK_ID:-}
+      OP_KEY_SCOUT: ${OP_KEY_SCOUT:?}
+      OP_KEY_CODER: ${OP_KEY_CODER:?}
+      OP_KEY_REVIEWER: ${OP_KEY_REVIEWER:?}
+      OP_KEY_ORCHESTRATOR: ${OP_KEY_ORCHESTRATOR:?}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?}
+
+      # Agents
+      AGENT_URL_SCOUT: http://scout:8000
+      AGENT_URL_CODER: http://coder:8000
+      AGENT_URL_REVIEWER: http://reviewer:8000
+
+      # Credit watcher
+      ANTHROPIC_ADMIN_KEY: ${ANTHROPIC_ADMIN_KEY:-}
+      DEMO_BUDGET_USD: ${DEMO_BUDGET_USD:-5}
+
+      # Règles de la spec
+      MAX_RUNS_PER_TASK: 10
+      MAX_REVIEW_CYCLES: 3
+      MAX_CONCURRENT_RUNS: 3
+      POLL_INTERVAL_S: 30
+      LOG_RETENTION_DAYS: 30
+
+      # OpenTelemetry
+      OTEL_SERVICE_NAME: orchestrator
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
+    volumes:
+      - orch_data:/app/data        # states
+      - orch_logs:/app/logs        # execution logs
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [openproject, agents, egress]
+
+  # --- the 3 agents ---
+  scout:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      AGENT_ROLE: scout
+      ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_SCOUT:?}
+      MODEL: ${MODEL_SCOUT:-claude-sonnet-5}
+      OTEL_SERVICE_NAME: agent-scout
+    volumes:
+      - ./prompts/scout.md:/app/prompt.md:ro
+
+  coder:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      AGENT_ROLE: coder
+      ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_CODER:?}
+      MODEL: ${MODEL_CODER:-claude-sonnet-5}
+      OTEL_SERVICE_NAME: agent-coder
+    volumes:
+      - ./prompts/coder.md:/app/prompt.md:ro
+
+  reviewer:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      AGENT_ROLE: reviewer
+      ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_REVIEWER:?}
+      MODEL: ${MODEL_REVIEWER:-claude-sonnet-5}
+      OTEL_SERVICE_NAME: agent-reviewer
+    volumes:
+      - ./prompts/reviewer.md:/app/prompt.md:ro
+
+  # --- APM ---
+  jaeger:
+    image: jaegertracing/jaeger:${JAEGER_TAG:-2.21.0}
+    profiles: [apm]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16686:16686"    # Jaeger UI
+    expose: ["4317", "4318"]       # OTLP gRPC / HTTP
+    networks: [agents]
+
+volumes:
+  op_pgdata:
+  op_assets:
+  orch_data:
+  orch_logs:
+
+networks:
+  openproject:                     # OpenProject <-> orchestrator
+  agents:                          # orchestrator <-> agents <-> Jaeger
+    internal: true
+  egress:                          # Internet for Claud API
