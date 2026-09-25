@@ -13,6 +13,12 @@ nginx/           TLS reverse proxy
 
 ## Model
 
+All three agents use Anthropic's Claude Haiku 4.5, chosen for simplicity: one provider, one model, one pricing entry.
+Pi (pi.dev) is not tied to a provider. Each agent can run a different model, including other cloud providers or local
+models (e.g. through Ollama or any OpenAI-compatible server): declare the provider and model in `agent/pi/models.json`,
+then set the agent's `MODEL` and `PROVIDER` (default `anthropic`) in `docker-compose.yml`. Local models cost nothing
+per token, so give them zero prices in `orchestrator/pricing.json`.
+
 > [!WARNING]
 > The three agents run on `claude-haiku-4-5-20251001`, **supported until October 15, 2026**.
 > After that date, agent runs will fail. To switch models, update all three together:
