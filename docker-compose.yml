@@ -55,6 +55,7 @@ services:
       OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-openproject.example.com}
       OPENPROJECT_HTTPS: "true"
       OPENPROJECT_DEFAULT__LANGUAGE: fr
+      OPENPROJECT_SSRF__PROTECTION__IP__ALLOWLIST: 172.28.10.10   # webhook -> orchestrator (private IP)
     volumes:
       - op_pgdata:/var/openproject/pgdata
       - op_assets:/var/openproject/assets
@@ -119,7 +120,11 @@ services:
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
-    networks: [openproject, agents, egress]
+    networks:
+      openproject:
+        ipv4_address: 172.28.10.10   # fixed: allowed in OpenProject's SSRF protection
+      agents:
+      egress:
 
   # --- agent config ---
   scout:
@@ -175,6 +180,8 @@ volumes:
 
 networks:
   openproject:                     # OpenProject <-> orchestrator
+    ipam:
+      config: [{ subnet: 172.28.10.0/24 }]
   agents:                          # orchestrator <-> agents <-> Jaeger
     internal: true
   egress:                          # internet
