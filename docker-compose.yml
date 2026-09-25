@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     expose: ["80"]   # for nginx
     environment:
-      OPENPROJECT_SECRET_KEY_BASE: ${OPENPROJECT_SECRET_KEY_BASE}
+      SECRET_KEY_BASE: ${OPENPROJECT_SECRET_KEY_BASE}
       OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-openproject.example.com}
       OPENPROJECT_HTTPS: "true"
       OPENPROJECT_DEFAULT__LANGUAGE: fr
