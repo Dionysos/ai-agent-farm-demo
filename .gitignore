@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# TLS certificates / keys
+nginx/certs/*
+!nginx/certs/.gitkeep
+nginx/dev/certs/

@@ -1,0 +1,8 @@
+# Dev overlay: nginx with a self-signed certificate
+# Enabled with COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml in .env
+
+services:
+  nginx:
+    volumes:
+      - ./nginx/dev/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/dev/certs:/etc/nginx/certs:ro
