@@ -14,30 +14,47 @@ x-agent: &agent
   cap_drop: [ALL]
   networks: [agents, egress] # no direct access to OpenProject
   healthcheck:
-    test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+    test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
     interval: 15s
     timeout: 5s
     retries: 5
+    start_period: 20s
 
 x-agent-env: &agent-env
   RUN_TIMEOUT_S: 300
+  THINKING: ${AGENT_THINKING:-off}      # off, low, medium, high
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
 
 services:
 
+  # --- Reverse proxy ---
+  nginx:
+    image: nginx:${NGINX_TAG:-1.29-alpine}
+    restart: unless-stopped
+    depends_on:
+      openproject: { condition: service_healthy }
+    ports:
+      - "443:443"                     # todo: security group Scaleway : only cloudflare ips
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    networks: [openproject]
+
   # --- OpenProject (image all-in-one : PostgreSQL + memcached) ---
   openproject:
     image: openproject/openproject:17.8.0
     restart: unless-stopped
-    ports:
-      - "${OPENPROJECT_PORT:-8080}:80"
+    expose: ["80"]   # for nginx
     environment:
       OPENPROJECT_SECRET_KEY_BASE: ${OPENPROJECT_SECRET_KEY_BASE}
-      OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-localhost:8080}
-      OPENPROJECT_HTTPS: "false"
-      OPENPROJECT_DEFAULT__LANGUAGE: en
+      OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-openproject.example.com}
+      OPENPROJECT_HTTPS: "true"
+      OPENPROJECT_DEFAULT__LANGUAGE: fr
     volumes:
       - op_pgdata:/var/openproject/pgdata
       - op_assets:/var/openproject/assets
@@ -76,32 +93,34 @@ services:
       AGENT_URL_CODER: http://coder:8000
       AGENT_URL_REVIEWER: http://reviewer:8000
 
-      # Credit watcher
-      ANTHROPIC_ADMIN_KEY: ${ANTHROPIC_ADMIN_KEY:-}
-      DEMO_BUDGET_USD: ${DEMO_BUDGET_USD:-5}
+      # Suivi du crédit
+      ANTHROPIC_ADMIN_KEY: ${ANTHROPIC_ADMIN_KEY:-}   # Usage & Cost (not mandatory)
+      ANTHROPIC_WORKSPACE_IDS: ${ANTHROPIC_WORKSPACE_IDS:-}
+      DEMO_BUDGET_USD: ${DEMO_BUDGET_USD:-50}
 
       # Règles de la spec
       MAX_RUNS_PER_TASK: 10
       MAX_REVIEW_CYCLES: 3
       MAX_CONCURRENT_RUNS: 3
       POLL_INTERVAL_S: 30
+      RUN_TIMEOUT_S: 300
       LOG_RETENTION_DAYS: 30
 
       # OpenTelemetry
       OTEL_SERVICE_NAME: orchestrator
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
     volumes:
-      - orch_data:/app/data        # states
-      - orch_logs:/app/logs        # execution logs
+      - orch_data:/app/data        # state (SQLite)
+      - orch_logs:/app/logs        # logs
     read_only: true
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     networks: [openproject, agents, egress]
 
-  # --- the 3 agents ---
+  # --- agent config ---
   scout:
     <<: *agent
     environment:
@@ -135,15 +154,17 @@ services:
     volumes:
       - ./prompts/reviewer.md:/app/prompt.md:ro
 
-  # --- APM ---
+  # --- APM (optionnel) ---
   jaeger:
-    image: jaegertracing/jaeger:${JAEGER_TAG:-2.21.0}
+    image: jaegertracing/jaeger:${JAEGER_TAG:-2.10.0}
     profiles: [apm]
     restart: unless-stopped
+    environment:
+      JAEGER_LISTEN_HOST: 0.0.0.0
     ports:
-      - "127.0.0.1:16686:16686"    # Jaeger UI
+      - "127.0.0.1:16686:16686"    # ssh tunnel for Jager UI
     expose: ["4317", "4318"]       # OTLP gRPC / HTTP
-    networks: [agents]
+    networks: [agents, observability]
 
 volumes:
   op_pgdata:
@@ -155,4 +176,5 @@ networks:
   openproject:                     # OpenProject <-> orchestrator
   agents:                          # orchestrator <-> agents <-> Jaeger
     internal: true
-  egress:                          # Internet for Claud API
+  egress:                          # internet
+  observability:                   # Jaeger
