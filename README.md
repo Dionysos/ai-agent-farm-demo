@@ -11,6 +11,14 @@ orchestrator/    webhook, polling, routing, context, publishing, credit tracking
 nginx/           TLS reverse proxy
 ```
 
+## Model
+
+> [!WARNING]
+> The three agents run on `claude-haiku-4-5-20251001`, **supported until October 15, 2026**.
+> After that date, agent runs will fail. To switch models, update all three together:
+> `agent/pi/models.json` (model declared to Pi), `orchestrator/pricing.json` (price per million tokens,
+> then set `verified` to `true`), and `MODEL_SCOUT` / `MODEL_CODER` / `MODEL_REVIEWER` in `.env`.
+
 ## Installation
 
 1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with only port 443 open,
