@@ -1,0 +1,4 @@
+{
+  "_comment": "USD par million de tokens. Vérifier chaque tarif dans la console Claude Platform ou sur anthropic.com/pricing, puis passer verified à true. claude-haiku-4-5-20251001 : supporté jusqu'au 15 octobre 2026.",
+  "claude-haiku-4-5-20251001": { "input": 1.0, "output": 5.0, "cache_write": 1.25, "cache_read": 0.10, "verified": true }
+}
