@@ -62,7 +62,6 @@ class WorkPackage:
     author_id: int | None
     lock_version: int
     updated_at: datetime
-    schema_href: str
     raw: dict[str, Any] = field(repr=False)
 
 
@@ -142,7 +141,6 @@ def _to_work_package(d: dict[str, Any]) -> WorkPackage:
         author_id=id_from_href(links.get("author", {}).get("href")),
         lock_version=d["lockVersion"],
         updated_at=_dt(d["updatedAt"]),
-        schema_href=links["schema"]["href"],
         raw=d,
     )
 
@@ -164,7 +162,6 @@ class OpenProjectClient:
             timeout=timeout,
             headers=headers,
         )
-        self._schema_cache: dict[str, dict[str, tuple[str, str]]] = {}
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -245,24 +242,6 @@ class OpenProjectClient:
         data = await self._request("GET", f"{API}/statuses")
         return {normalize(s["name"]): s["id"] for s in data["_embedded"]["elements"]}
 
-    async def custom_fields(self, wp: WorkPackage) -> dict[str, tuple[str, str]]:
-        """{nom normalisé du champ: (clé API 'customFieldN', type)} depuis le schéma de la tâche."""
-        if wp.schema_href not in self._schema_cache:
-            schema = await self._request("GET", wp.schema_href)
-            self._schema_cache[wp.schema_href] = {
-                normalize(v["name"]): (k, v.get("type", ""))
-                for k, v in schema.items()
-                if k.startswith("customField") and isinstance(v, dict) and "name" in v
-            }
-        return self._schema_cache[wp.schema_href]
-
-    async def get_custom_field(self, wp: WorkPackage, name: str) -> Any:
-        key, ftype = (await self.custom_fields(wp)).get(normalize(name), (None, None))
-        if key is None:
-            raise KeyError(f"champ personnalisé introuvable : {name}")
-        value = wp.raw.get(key)
-        return (value or {}).get("raw", "") if ftype == "Formattable" else value
-
     # ------------------------------------------------------------ écriture
 
     async def add_comment(self, wp_id: int, markdown: str) -> Activity:
@@ -273,25 +252,15 @@ class OpenProjectClient:
         )
         return _to_activity(wp_id, data)
 
-    async def update_work_package(self, wp_id: int, *, status_id: int | None = None,
-                                  custom_fields: dict[str, Any] | None = None,
-                                  retries: int = 3) -> WorkPackage:
-        """Change le statut et/ou des champs personnalisés (par nom), avec gestion du verrou optimiste.
+    async def update_work_package(self, wp_id: int, *, status_id: int, retries: int = 3) -> WorkPackage:
+        """Change le statut, avec gestion du verrou optimiste.
 
         Une transition refusée par le workflow OpenProject lève OpenProjectError (422).
         """
         for attempt in range(retries):
             wp = await self.get_work_package(wp_id)
-            body: dict[str, Any] = {"lockVersion": wp.lock_version}
-            if status_id is not None:
-                body["_links"] = {"status": {"href": f"{API}/statuses/{status_id}"}}
-            if custom_fields:
-                fields = await self.custom_fields(wp)
-                for name, value in custom_fields.items():
-                    key, ftype = fields.get(normalize(name), (None, None))
-                    if key is None:
-                        raise KeyError(f"champ personnalisé introuvable : {name}")
-                    body[key] = {"raw": str(value)} if ftype == "Formattable" else value
+            body: dict[str, Any] = {"lockVersion": wp.lock_version,
+                                    "_links": {"status": {"href": f"{API}/statuses/{status_id}"}}}
             try:
                 return _to_work_package(
                     await self._request("PATCH", f"{API}/work_packages/{wp_id}", json=body))

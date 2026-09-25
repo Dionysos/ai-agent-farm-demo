@@ -13,7 +13,7 @@ from .context import LABELS, MAX_SUMMARY, build_context
 from .journal import Journal
 from .openproject import OpenProjectClient, WorkPackage, mention, normalize
 from .pricing import Pricing, Usage
-from .publisher import SUMMARY_FIELD, AgentOutput, Publisher
+from .publisher import AgentOutput, Publisher, is_info, latest_summary
 from .router import Decision, route
 from .state import StateStore
 from .sync import Event
@@ -126,11 +126,9 @@ class Runner:
         role, mode = decision.agent, decision.mode
         label = LABELS[role]
         cycle = int(self._store.number(f"refusals:{wp.id}")) + 1
-        comments = await self._orch.list_comments(wp.id)
-        try:
-            summary = await self._orch.get_custom_field(wp, SUMMARY_FIELD) or ""
-        except KeyError:
-            summary = ""
+        all_comments = await self._orch.list_comments(wp.id)
+        summary = latest_summary(all_comments, self._role_of)
+        comments = [c for c in all_comments if not is_info(c, self._role_of)]
 
         if mode == "reply":
             trigger = f"Commentaire de l'humain qui te mentionne :\n\n{event.comment.raw}"

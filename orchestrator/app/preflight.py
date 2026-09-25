@@ -2,7 +2,7 @@
 
     docker compose exec orchestrator python -m app.preflight
 
-Contrôle les comptes OpenProject, le projet, les statuts, les champs personnalisés,
+Contrôle les comptes OpenProject, le projet, les statuts,
 la tâche de suivi, les agents et la table de tarifs. Code de sortie 1 si un point bloque.
 """
 from __future__ import annotations
@@ -14,7 +14,6 @@ from .agents import AgentClient
 from .config import ACCOUNTS, AGENT_ROLES, Settings
 from .openproject import OpenProjectClient, normalize
 from .pricing import Pricing
-from .publisher import CONSUMED_FIELD, REMAINING_FIELD, SUMMARY_FIELD, WP_COST_FIELD
 from .reconcile import fetch_cost_usd
 
 REQUIRED_STATUSES = ("Nouveau", "Analyse", "Développement", "Revue", "À valider", "Terminé", "Bloqué")
@@ -51,22 +50,10 @@ async def main() -> int:
     for name in REQUIRED_STATUSES:
         check(normalize(name) in statuses, f"statut « {name} »")
 
-    wps = await orch.project_work_packages(s.project, page_size=10)
-    sample = next((w for w in wps if w.id != s.tracking_task_id), None)
-    if sample:
-        fields = await orch.custom_fields(sample)
-        for name in (SUMMARY_FIELD, WP_COST_FIELD):
-            check(normalize(name) in fields, f"champ « {name} » sur les tâches", f"vérifié sur #{sample.id}")
-    else:
-        print("⚠️  aucune tâche de travail : créez-en une pour vérifier les champs « Résumé agents » et « Coût agents »")
-
     if check(s.tracking_task_id is not None, "OPENPROJECT_TRACKING_TASK_ID renseigné"):
         try:
             tracking = await orch.get_work_package(s.tracking_task_id)
             check(True, "tâche de suivi", f"#{tracking.id} {tracking.subject}")
-            fields = await orch.custom_fields(tracking)
-            for name in (CONSUMED_FIELD, REMAINING_FIELD):
-                check(normalize(name) in fields, f"champ « {name} » sur la tâche de suivi")
         except Exception as exc:
             check(False, "tâche de suivi", str(exc))
 

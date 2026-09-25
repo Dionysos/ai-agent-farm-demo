@@ -4,14 +4,29 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from .openproject import OpenProjectClient, OpenProjectError, normalize
+from .openproject import Activity, OpenProjectClient, OpenProjectError, normalize
 
 log = logging.getLogger(__name__)
 
-SUMMARY_FIELD = "Résumé agents"
-WP_COST_FIELD = "Coût agents (USD)"
-CONSUMED_FIELD = "Crédit consommé (USD)"
-REMAINING_FIELD = "Crédit restant (USD)"
+# Pas de champs personnalisés (réservés à l'édition payante d'OpenProject) : le résumé et les
+# cumuls de coût sont publiés en commentaires de l'orchestrateur préfixés par INFO.
+INFO_PREFIX = "INFO · "
+SUMMARY_TITLE = "Résumé agents"
+
+
+def is_info(comment: Activity, role_of: dict[int, str]) -> bool:
+    """Commentaire INFO de l'orchestrateur (résumé, cumuls) : exclu des échanges envoyés aux agents."""
+    return role_of.get(comment.author_id) == "orchestrator" and comment.raw.lstrip().startswith(INFO_PREFIX)
+
+
+def latest_summary(comments: list[Activity], role_of: dict[int, str]) -> str:
+    """Texte du dernier commentaire « INFO · Résumé agents », ou "" s'il n'y en a pas."""
+    header = f"{INFO_PREFIX}{SUMMARY_TITLE}"
+    for c in reversed(comments):
+        raw = c.raw.strip()
+        if is_info(c, role_of) and raw.startswith(header):
+            return raw[len(header):].strip()
+    return ""
 
 # Transitions autorisées par agent (spec, section 2) : statut courant -> statuts demandables
 ALLOWED_TRANSITIONS: dict[str, dict[str, set[str]]] = {
@@ -65,7 +80,7 @@ class Publisher:
         return comment.id, wanted
 
     async def save_summary(self, wp_id: int, summary: str) -> None:
-        await self._set_fields(wp_id, {SUMMARY_FIELD: summary})
+        await self.info(wp_id, f"{SUMMARY_TITLE}\n\n{summary}")
 
     async def block(self, wp_id: int, reason: str) -> None:
         await self.error(wp_id, reason)
@@ -76,6 +91,9 @@ class Publisher:
     async def error(self, wp_id: int, message: str) -> None:
         await self._orch.add_comment(wp_id, f"⚠️ **Orchestrateur** · {message}")
 
+    async def info(self, wp_id: int, message: str) -> None:
+        await self._orch.add_comment(wp_id, f"{INFO_PREFIX}{message}")
+
     async def tracking_comment(self, tracking_task_id: int, text: str) -> None:
         await self._orch.add_comment(tracking_task_id, text)
 
@@ -84,15 +102,6 @@ class Publisher:
         """Ligne de coût dans la tâche de suivi + mise à jour des cumuls (spec, section 8)."""
         if tracking_task_id:
             await self._orch.add_comment(tracking_task_id, line)
-            await self._set_fields(tracking_task_id, {
-                CONSUMED_FIELD: round(consumed_usd, 4),
-                REMAINING_FIELD: round(max(remaining_usd, 0.0), 4),
-            })
-        await self._set_fields(wp_id, {WP_COST_FIELD: round(wp_total_usd, 4)})
-
-    async def _set_fields(self, wp_id: int, fields: dict) -> None:
-        # Un champ manquant ne doit pas bloquer la démo : on journalise et on continue
-        try:
-            await self._orch.update_work_package(wp_id, custom_fields=fields)
-        except KeyError as exc:
-            log.warning("#%s : %s", wp_id, exc)
+            await self.info(tracking_task_id, f"Crédit consommé : {consumed_usd:.4f} USD · "
+                                              f"Crédit restant : {max(remaining_usd, 0.0):.4f} USD")
+        await self.info(wp_id, f"Coût agents : {wp_total_usd:.4f} USD (cumul de la tâche)")
