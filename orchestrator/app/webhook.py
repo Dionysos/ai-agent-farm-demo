@@ -12,6 +12,8 @@ import logging
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
+from .openproject import id_from_href
+
 log = logging.getLogger(__name__)
 
 _ALGOS = {"sha1": hashlib.sha1, "sha256": hashlib.sha256}
@@ -29,6 +31,21 @@ def verify_signature(secret: str, body: bytes, header: str | None) -> bool:
     return hmac.compare_digest(expected, received)
 
 
+def work_package_id(action: str, payload: dict) -> int | None:
+    """Id de la tâche concernée, ou None pour un événement sans rapport.
+
+    work_package:*          -> {"work_package": {"id": 42, …}}
+    work_package_comment:*  -> {"activity": {"_links": {"workPackage": {"href": "/api/v3/work_packages/42"}}}}
+    """
+    if action.startswith("work_package:"):
+        wp_id = (payload.get("work_package") or {}).get("id")
+        return wp_id if isinstance(wp_id, int) else None
+    if action.startswith("work_package_comment:"):
+        links = (payload.get("activity") or {}).get("_links") or {}
+        return id_from_href((links.get("workPackage") or {}).get("href"))
+    return None
+
+
 def build_router(secret: str, queue: asyncio.Queue[tuple[int, str]]) -> APIRouter:
     router = APIRouter()
 
@@ -41,8 +58,8 @@ def build_router(secret: str, queue: asyncio.Queue[tuple[int, str]]) -> APIRoute
 
         payload = await request.json()
         action = payload.get("action", "")
-        wp_id = (payload.get("work_package") or {}).get("id")
-        if action.startswith("work_package:") and isinstance(wp_id, int):
+        wp_id = work_package_id(action, payload)
+        if wp_id is not None:
             queue.put_nowait((wp_id, "webhook"))
             log.info("Webhook %s pour #%s", action, wp_id)
         return {"status": "accepted"}
