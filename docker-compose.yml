@@ -80,6 +80,7 @@ services:
     environment:
       # OpenProject
       OPENPROJECT_URL: http://openproject:80
+      OPENPROJECT_HOST: ${OPENPROJECT_HOST:-openproject.example.com}   # same as OPENPROJECT_HOST__NAME
       OPENPROJECT_PROJECT: ${OPENPROJECT_PROJECT:-demo-agents}
       OPENPROJECT_TRACKING_TASK_ID: ${OPENPROJECT_TRACKING_TASK_ID:-}
       OP_KEY_SCOUT: ${OP_KEY_SCOUT:?}
@@ -127,7 +128,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: scout
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_SCOUT:?}
-      MODEL: ${MODEL_SCOUT:-claude-sonnet-5}
+      MODEL: ${MODEL_SCOUT:-claude-haiku-4-5-20251001}
       OTEL_SERVICE_NAME: agent-scout
     volumes:
       - ./prompts/scout.md:/app/prompt.md:ro
@@ -138,7 +139,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: coder
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_CODER:?}
-      MODEL: ${MODEL_CODER:-claude-sonnet-5}
+      MODEL: ${MODEL_CODER:-claude-haiku-4-5-20251001}
       OTEL_SERVICE_NAME: agent-coder
     volumes:
       - ./prompts/coder.md:/app/prompt.md:ro
@@ -149,7 +150,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: reviewer
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_REVIEWER:?}
-      MODEL: ${MODEL_REVIEWER:-claude-sonnet-5}
+      MODEL: ${MODEL_REVIEWER:-claude-haiku-4-5-20251001}
       OTEL_SERVICE_NAME: agent-reviewer
     volumes:
       - ./prompts/reviewer.md:/app/prompt.md:ro
