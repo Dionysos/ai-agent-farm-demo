@@ -27,6 +27,7 @@ log = logging.getLogger("agent")
 
 ROLE = os.environ["AGENT_ROLE"]
 MODEL = os.environ["MODEL"]
+PROVIDER = os.getenv("PROVIDER", "anthropic")   # fournisseur Pi déclaré dans models.json
 THINKING = os.getenv("THINKING", "off")
 TIMEOUT_S = int(os.getenv("RUN_TIMEOUT_S", "300"))
 SYSTEM_PROMPT = Path(os.getenv("PROMPT_PATH", "/app/prompt.md")).read_text(encoding="utf-8")
@@ -106,7 +107,7 @@ def run_pi(context: str, extra: str | None, span=None) -> dict:
         message = MESSAGE + (f"\n\n{extra}" if extra else "")
         cmd = ["pi", "--mode", "json", "--no-session", "--no-tools", "--no-extensions",
                "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files",
-               "--offline", "--provider", "anthropic", "--model", MODEL, "--thinking", THINKING,
+               "--offline", "--provider", PROVIDER, "--model", MODEL, "--thinking", THINKING,
                "--system-prompt", SYSTEM_PROMPT, f"@{ctx_file}", message]
         stderr_file = Path(workdir) / "stderr.log"
         with open(stderr_file, "w", encoding="utf-8") as err:
@@ -176,7 +177,7 @@ def _llm_span(msg: dict, u: dict, start_ns: int, end_ns: int) -> None:
         return
     attrs = {
         "gen_ai.operation.name": "chat",
-        "gen_ai.provider.name": "anthropic",
+        "gen_ai.provider.name": PROVIDER,
         "gen_ai.request.model": MODEL,
         "gen_ai.response.model": msg.get("responseModel") or msg.get("model") or MODEL,
         "gen_ai.usage.input_tokens": u.get("input", 0),
