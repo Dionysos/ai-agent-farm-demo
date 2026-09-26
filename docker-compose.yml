@@ -36,7 +36,7 @@ services:
     depends_on:
       openproject: { condition: service_healthy }
     ports:
-      - "443:443"                     # todo: security group Scaleway : only cloudflare ips
+      - "443:443"                     # Scaleway security group restricts who can reach it
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro

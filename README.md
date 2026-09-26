@@ -27,9 +27,11 @@ per token, so give them zero prices in `orchestrator/pricing.json`.
 
 ## Installation
 
-1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with only port 443 open,
-   restricted to Cloudflare IP ranges, and SSH limited to my IP.
-2. **Cloudflare**: TODO
+1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with only port 443 open
+   (restricted to the allowed source IPs) and SSH limited to my IP.
+2. **TLS certificate**: DNS record for `openproject.example.com` pointing to the instance, then a certificate
+   (e.g. Let's Encrypt) copied to `nginx/certs/fullchain.pem` and `nginx/certs/privkey.pem`.
+   nginx terminates TLS itself and rejects any other host name.
 3. **Configuration**: `cp .env.example .env`, then fill in at least `OPENPROJECT_SECRET_KEY_BASE`
    (`openssl rand -hex 64`) and `WEBHOOK_SECRET` (`openssl rand -hex 32`). The other keys come in steps 5 and 6.
 4. **First start, OpenProject only**:
