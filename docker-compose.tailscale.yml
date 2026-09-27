@@ -1,0 +1,13 @@
+# Tailscale Funnel overlay: nginx published on the host loopback, no Cloudflare Tunnel
+# Enabled with COMPOSE_FILE=docker-compose.yml:docker-compose.tailscale.yml in .env
+# then on the host: tailscale funnel --bg http://127.0.0.1:80
+
+services:
+  nginx:
+    ports:
+      - "127.0.0.1:80:80"          # reached only by tailscaled (Funnel)
+    volumes:
+      - ./nginx/tailscale/conf.d:/etc/nginx/conf.d:ro
+
+  cloudflared:
+    profiles: [tunnel]             # not started with Funnel
