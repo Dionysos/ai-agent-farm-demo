@@ -8,7 +8,7 @@ Three agents (Scout, Coder, Reviewer) driven from OpenProject and run by Pi on t
 agent/           agent service: HTTP server (Python stdlib) wrapping the Pi CLI
 prompts/         system prompts for the 3 agents
 orchestrator/    webhook, polling, routing, context, publishing, credit tracking
-nginx/           TLS reverse proxy
+nginx/           reverse proxy behind Cloudflare Tunnel (self-signed TLS in dev)
 ```
 
 ## Model
@@ -27,16 +27,17 @@ per token, so give them zero prices in `orchestrator/pricing.json`.
 
 ## Installation
 
-1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with only port 443 open
-   (restricted to the allowed source IPs) and SSH limited to my IP.
-2. **TLS certificate**: DNS record for `openproject.example.com` pointing to the instance, then a certificate
-   (e.g. Let's Encrypt) copied to `nginx/certs/fullchain.pem` and `nginx/certs/privkey.pem`.
-   nginx terminates TLS itself and rejects any other host name.
+1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with no inbound port
+   except SSH limited to my IP.
+2. **Cloudflare Tunnel**: in Zero Trust > Networks > Tunnels, create a tunnel, copy its token to
+   `CLOUDFLARE_TUNNEL_TOKEN`, and add the public hostname `openproject.example.com` -> `HTTP` -> `nginx:80`.
+   Cloudflare terminates TLS; `cloudflared` only opens outbound connections. Restrict who can reach the
+   site with Cloudflare Access. nginx rejects any other host name.
 3. **Configuration**: `cp .env.example .env`, then fill in at least `OPENPROJECT_SECRET_KEY_BASE`
    (`openssl rand -hex 64`) and `WEBHOOK_SECRET` (`openssl rand -hex 32`). The other keys come in steps 5 and 6.
 4. **First start, OpenProject only**:
 ```bash
-   docker compose up -d openproject nginx
+   docker compose up -d openproject nginx cloudflared
 ```
 5. **OpenProject setup**
 6. **Claude Platform**: one workspace per agent, each with its own key (`ANTHROPIC_KEY_*`) and a spend limit

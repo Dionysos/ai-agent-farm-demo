@@ -29,21 +29,32 @@ x-agent-env: &agent-env
 
 services:
 
-  # --- Reverse proxy ---
+  # --- Cloudflare Tunnel: outbound connection only, no inbound port on the server ---
+  cloudflared:
+    image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-2026.9.3}
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}   # public hostname -> http://nginx:80
+    depends_on: [nginx]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [tunnel, egress]
+
+  # --- Reverse proxy (plain HTTP, reached only by cloudflared) ---
   nginx:
     image: nginx:${NGINX_TAG:-1.29-alpine}
     restart: unless-stopped
     depends_on:
       openproject: { condition: service_healthy }
-    ports:
-      - "443:443"                     # Scaleway security group restricts who can reach it
+    expose: ["80"]
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
     read_only: true
     tmpfs: [/var/cache/nginx, /var/run, /tmp]
-    networks: [openproject]
+    networks: [openproject, tunnel]
 
   # --- OpenProject (image all-in-one : PostgreSQL + memcached) ---
   openproject:
@@ -182,6 +193,10 @@ networks:
   openproject:                     # OpenProject <-> orchestrator
     ipam:
       config: [{ subnet: 172.28.10.0/24 }]
+  tunnel:                          # cloudflared <-> nginx (subnet trusted by nginx real_ip)
+    internal: true
+    ipam:
+      config: [{ subnet: 172.28.20.0/24 }]
   agents:                          # orchestrator <-> agents <-> Jaeger
     internal: true
   egress:                          # internet

@@ -1,8 +1,13 @@
-# Dev overlay: nginx with a self-signed certificate
+# Dev overlay: nginx with a self-signed certificate, no Cloudflare Tunnel
 # Enabled with COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml in .env
 
 services:
   nginx:
+    ports:
+      - "443:443"
     volumes:
       - ./nginx/dev/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/dev/certs:/etc/nginx/certs:ro
+
+  cloudflared:
+    profiles: [tunnel]             # not started in dev
