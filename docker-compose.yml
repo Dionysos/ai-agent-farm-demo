@@ -63,7 +63,7 @@ services:
     expose: ["80"]   # for nginx
     environment:
       SECRET_KEY_BASE: ${OPENPROJECT_SECRET_KEY_BASE}
-      OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST:-openproject.example.com}
+      OPENPROJECT_HOST__NAME: ${OPENPROJECT_HOST}
       OPENPROJECT_HTTPS: "true"
       OPENPROJECT_DEFAULT__LANGUAGE: fr
       OPENPROJECT_SSRF__PROTECTION__IP__ALLOWLIST: 172.28.10.10   # webhook -> orchestrator (private IP)
@@ -92,7 +92,7 @@ services:
     environment:
       # OpenProject
       OPENPROJECT_URL: http://openproject:80
-      OPENPROJECT_HOST: ${OPENPROJECT_HOST:-openproject.example.com}   # same as OPENPROJECT_HOST__NAME
+      OPENPROJECT_HOST: ${OPENPROJECT_HOST}   # same as OPENPROJECT_HOST__NAME
       OPENPROJECT_PROJECT: ${OPENPROJECT_PROJECT:-demo-agents}
       OPENPROJECT_TRACKING_TASK_ID: ${OPENPROJECT_TRACKING_TASK_ID:-}
       OP_KEY_SCOUT: ${OP_KEY_SCOUT:?}

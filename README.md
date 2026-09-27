@@ -30,7 +30,7 @@ per token, so give them zero prices in `orchestrator/pricing.json`.
 1. **Scaleway instance**: Docker + docker compose, key-based SSH, security group with no inbound port
    except SSH limited to my IP.
 2. **Cloudflare Tunnel**: in Zero Trust > Networks > Tunnels, create a tunnel, copy its token to
-   `CLOUDFLARE_TUNNEL_TOKEN`, and add the public hostname `openproject.example.com` -> `HTTP` -> `nginx:80`.
+   `CLOUDFLARE_TUNNEL_TOKEN`, and add the public hostname -> `HTTP` -> `nginx:80`.
    Cloudflare terminates TLS; `cloudflared` only opens outbound connections. Restrict who can reach the
    site with Cloudflare Access. nginx rejects any other host name.
 3. **Configuration**: `cp .env.example .env`, then fill in at least `OPENPROJECT_SECRET_KEY_BASE`
