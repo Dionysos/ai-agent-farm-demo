@@ -1,8 +1,11 @@
-# Ferme d'agents IA sur OpenProject
+# Une équipe d'agents IA pilotée depuis OpenProject
 
-Une petite équipe de développement composée d'**un humain et de trois agents IA**, qui travaillent ensemble dans
-un outil de gestion de projet du marché ([OpenProject](https://www.openproject.org/)). L'humain décrit un besoin,
-les agents l'analysent, écrivent le code et le relisent, puis l'humain valide.
+Une petite équipe de développement composée d'**un humain et de trois agents IA** (Scout, Coder, Reviewer), qui
+traitent une demande de bout en bout dans un outil de gestion de projet du marché,
+[OpenProject](https://www.openproject.org/). Chaque agent a son propre compte : il lit les tickets, commente, change
+les statuts et passe la main au suivant, comme le ferait une équipe humaine.
+
+*Conception et réalisation : Denis Felicelli.*
 
 **Sommaire** · [Partie 1 : la démo en bref](#partie-1--la-démo-en-bref) ·
 [Partie 2 : dossier technique](#partie-2--dossier-technique) ·
@@ -14,43 +17,101 @@ les agents l'analysent, écrivent le code et le relisent, puis l'humain valide.
 
 *Cette partie ne demande aucune connaissance technique.*
 
-## L'idée
+## L'objectif
 
 On demande souvent à une IA de répondre à une question isolée. Ce projet montre autre chose : **des agents IA
-intégrés à la façon de travailler d'une équipe**, dans un outil que l'équipe utilise déjà, avec des rôles clairs
-et un humain qui garde la main.
+intégrés à la façon de travailler d'une équipe**, dans un outil qu'elle utilise déjà, avec des rôles clairs et un
+humain qui garde la main.
 
-Chaque agent est un membre de l'équipe avec son propre compte, comme un collègue :
+L'intérêt de la démo n'est pas le code produit, volontairement simple, mais **l'orchestration** : déclenchement,
+passage de relais, contrôle qualité, traçabilité et maîtrise des coûts. Par simplicité, le code n'est pas versionné :
+le Coder le dépose en commentaire du ticket.
 
 | Agent | Son rôle, comme dans une vraie équipe |
 | --- | --- |
 | 🔎 **Scout** | L'analyste : il reformule le besoin, liste ses hypothèses et propose un plan. S'il manque une information, il pose la question à l'humain au lieu d'inventer. |
 | 💻 **Coder** | Le développeur : il écrit le code en suivant le plan, puis corrige ce que le Reviewer lui signale. |
-| ✅ **Reviewer** | Le relecteur : il vérifie le code (erreurs, sécurité, cas oubliés) et le renvoie au Coder ou le transmet à l'humain. |
+| ✅ **Reviewer** | Le relecteur : il vérifie le code (conformité au besoin, erreurs, sécurité) et le renvoie au Coder ou le transmet à l'humain. |
 
-## Le parcours d'une demande
+![Architecture de la démo](docs/screenshots/01-architecture.png)
 
-1. **L'humain crée une tâche** dans OpenProject, par exemple « une fonction qui valide un numéro de SIRET ».
-2. **Le Scout** l'analyse et publie un plan en commentaire.
-3. **Le Coder** écrit le code et l'envoie en revue.
-4. **Le Reviewer** le relit. S'il trouve un problème important, il renvoie la tâche au Coder, au plus trois fois.
-5. **L'humain** reçoit une notification, relit l'ensemble et clôt la tâche.
+## Déroulé pas à pas
 
-À tout moment, l'humain peut interpeller un agent en commentaire (« @Coder, ajoute des tests ») : l'agent répond
-sans faire avancer la tâche. Chaque intervention se lit dans l'historique de la tâche, signée par l'agent concerné.
+### 1. Création de la demande
+
+L'utilisateur crée un ticket dans OpenProject avec un titre, une description du besoin et des critères
+d'acceptation. Aucune syntaxe particulière n'est nécessaire.
+
+![Création de la demande](docs/screenshots/03-creation-demande.png)
+
+### 2. Prise en charge par l'orchestrateur
+
+OpenProject prévient l'orchestrateur, le chef d'orchestre de la démo. Il vérifie que le ticket n'a pas déjà été
+traité, l'enregistre, puis déclenche le Scout. Tout est visible dans l'onglet Activité du ticket.
+
+![Prise en charge par l'orchestrateur](docs/screenshots/04-prise-en-charge-orchestrateur.png)
+
+### 3. Analyse par le Scout
+
+Le Scout lit la demande, la reformule et propose un plan. Si la demande est floue, il pose ses questions en
+commentaire au lieu de laisser le Coder partir sur une mauvaise piste. Sinon, il passe le ticket en
+« Développement ».
+
+### 4. Développement par le Coder
+
+Le Coder écrit la solution en suivant le plan du Scout et publie le code en commentaire, avec une courte
+explication. Il passe ensuite le ticket en « Revue ».
+
+![Commentaire du Coder avec le bloc de code](docs/screenshots/05-code-coder.png)
+
+### 5. Revue par le Reviewer
+
+Le Reviewer vérifie le code au regard des critères d'acceptation, des bonnes pratiques et de la sécurité. Si le code
+est conforme, il le valide et passe le ticket en « À valider ». Sinon, il détaille les corrections attendues et
+renvoie le ticket en « Développement » : le Coder reprend la main, et la boucle continue jusqu'à validation, avec au
+plus trois allers-retours.
+
+![Revue avec demande de correction](docs/screenshots/06-revue-correction.png)
+
+![Validation au cycle 2 : le ticket passe en « À valider »](docs/screenshots/07-validation-cycle-2.png)
+
+### 6. Historique complet du ticket
+
+Toute la conversation entre agents reste tracée dans OpenProject : qui a fait quoi, quand, et pourquoi le statut a
+changé.
+
+![Historique complet d'un ticket](docs/screenshots/08-historique-ticket.png)
+
+### 7. Relance par mention
+
+L'utilisateur peut interpeller un agent à tout moment en le mentionnant dans un commentaire (@Scout, @Coder,
+@Reviewer). L'agent répond sans faire avancer le ticket. Dans l'exemple ci-dessous, le Scout repère une demande hors
+du champ technique et demande des précisions avant de la réaliser. L'utilisateur lui répond par mention, et le Scout
+livre le poème demandé.
+
+![Le Scout demande des précisions, l'utilisateur répond par mention](docs/screenshots/09-mention-precisions.png)
+
+![Le Scout livre le poème](docs/screenshots/10-mention-poeme.png)
+
+### 8. Suivi de la consommation
+
+Le coût de chaque intervention d'agent est calculé et consigné dans un ticket OpenProject dédié, pour garder la
+maîtrise du budget.
+
+![Ticket de suivi de la consommation](docs/screenshots/11-suivi-consommation.png)
 
 ## Ce que la démo met en avant
 
-- **L'humain décide.** Les agents proposent, l'humain valide. Les agents ne peuvent faire avancer une tâche que
-  vers les étapes prévues pour eux, et seul l'humain peut la clore.
+- **L'humain décide.** Les agents proposent, l'humain valide. Les agents ne peuvent faire avancer un ticket que vers
+  les étapes prévues pour eux, et seul l'humain peut le clore.
 - **Les coûts sont maîtrisés.** Chaque intervention est chiffrée et enregistrée. Un budget est fixé à l'avance :
   à 80 % les agents ne s'enchaînent plus seuls, à 100 % ils s'arrêtent.
 - **Le système ne s'emballe pas.** Les agents ne se répondent jamais entre eux en boucle, et le nombre
-  d'interventions par tâche est plafonné.
-- **La sécurité est pensée dès le départ.** Les agents n'ont accès à rien d'autre qu'au texte qu'on leur
-  transmet, et le serveur n'expose aucun port sur Internet.
-- **Rien n'est spécifique à un fournisseur d'IA.** Les agents utilisent aujourd'hui Claude d'Anthropic, mais
-  chacun peut passer à un autre modèle, y compris un modèle installé en local, par simple configuration.
+  d'interventions par ticket est plafonné.
+- **La sécurité est pensée dès le départ.** Les agents n'ont accès à rien d'autre qu'au texte qu'on leur transmet,
+  et le serveur n'ouvre aucun port sur Internet : l'accès public passe par un tunnel HTTPS (Tailscale Funnel).
+- **Rien n'est spécifique à un fournisseur d'IA.** Les agents utilisent aujourd'hui Claude d'Anthropic, mais chacun
+  peut passer à un autre modèle, y compris un modèle installé en local, par simple configuration.
 
 ## Compétences mobilisées
 
@@ -58,11 +119,17 @@ sans faire avancer la tâche. Chaque intervention se lit dans l'historique de la
 | --- | --- |
 | Architecture logicielle | Un service central (l'orchestrateur) qui coordonne trois agents indépendants et un outil existant |
 | Intégration d'IA générative | Rôles et consignes de chaque agent, format de réponse contrôlé, gestion des erreurs du modèle |
-| Fiabilité | Détection des changements par deux voies complémentaires, sans doublon ni perte silencieuse |
+| Fiabilité | Détection des changements par deux voies complémentaires, sans doublon, avec rattrapage des notifications manquées |
 | Sécurité | Isolement réseau, conteneurs en lecture seule, signatures, protection contre la manipulation des agents |
 | Maîtrise des coûts | Chiffrage de chaque appel, budget avec paliers, rapprochement avec la facturation réelle |
 | Observabilité | Traçage de bout en bout de chaque intervention, journal d'exécution |
 | Déploiement | Docker Compose, publication HTTPS par tunnel sans port entrant, mode développement local |
+
+## Accès à la démo
+
+Une instance de démonstration est accessible en ligne. Les identifiants sont communiqués sur demande : ils
+permettent de consulter les tickets existants et d'en créer de nouveaux pour voir les agents à l'œuvre. Comptez
+quelques minutes entre la création d'une demande et la fin du traitement par les trois agents.
 
 ---
 
@@ -86,6 +153,8 @@ flowchart LR
 | **Agents** ×3 | Serveur HTTP en bibliothèque standard Python autour du CLI [Pi](https://pi.dev) | Exécutent un modèle, sans outil, sans session, sans accès à OpenProject |
 | **nginx** | nginx | Proxy inverse : en-têtes transmis, limitation de débit sur `/login` |
 | **Jaeger** | Jaeger v2, profil `apm` optionnel | Visualisation des traces OpenTelemetry |
+
+![Services du docker compose](docs/screenshots/02-services-docker-compose.png)
 
 ## Workflow
 
@@ -216,6 +285,21 @@ d'Anthropic et publie l'écart.
 | Agents sans outil | Surface d'attaque minimale, coût prévisible | Le code produit n'est ni exécuté ni commité : c'est une démo de collaboration, pas un pipeline CI |
 | Pi plutôt qu'un SDK | Changement de fournisseur ou de modèle par configuration, nouvelles tentatives et suivi des tokens inclus | Une dépendance de plus à suivre |
 | Budget vérifié au routage | Simple et lisible | Le coût n'est connu qu'après l'exécution : avec 3 exécutions en parallèle, le budget peut être dépassé de 3 exécutions au plus. Le plafond par workspace Anthropic couvre ce cas |
+
+## Limites actuelles et évolutions
+
+- **Code généré** : pour la démo, le code est publié uniquement en commentaire des tickets. L'étape suivante serait de
+  créer des branches et des pull requests sur un dépôt Git, avec une exécution des tests en CI.
+- **Intégration MCP** : OpenProject propose un serveur MCP intégré qui donnerait aux agents un accès direct au
+  contexte des projets (tickets, relations, historique) sans code d'intégration spécifique. Il est cependant réservé
+  à l'édition Enterprise, encore expérimental et limité à la lecture : la démo s'appuie donc sur l'API REST v3 de
+  l'édition Community. Une piste intermédiaire serait un serveur MCP communautaire basé sur cette même API.
+- **Mise à l'échelle** : ajouter un agent revient à déclarer un service, créer son compte OpenProject et ajouter une
+  règle de routage. Pour une vraie montée en charge, les événements passeraient par une file de messages (RabbitMQ
+  ou Redis Streams) avec accusé de réception, ce qui découple la réception des demandes de leur traitement et
+  permet de lancer plusieurs instances de chaque agent. Les agents seraient alors déployés sur Kubernetes, avec un
+  nombre d'instances ajusté selon la longueur de la file, et l'état de l'orchestrateur passerait de SQLite à une
+  base partagée.
 
 ## Modèle
 
