@@ -105,7 +105,7 @@ def run_pi(context: str, extra: str | None, span=None) -> dict:
         ctx_file = Path(workdir) / "contexte.md"
         ctx_file.write_text(context, encoding="utf-8")
         message = MESSAGE + (f"\n\n{extra}" if extra else "")
-        cmd = ["pi", "--mode", "json", "--no-session", "--no-tools", "--no-extensions",
+        cmd = ["pi", "--mode", "json", "--no-session", "--no-tools", "--no-extensions", "--no-mcp",
                "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files",
                "--offline", "--provider", PROVIDER, "--model", MODEL, "--thinking", THINKING,
                "--system-prompt", SYSTEM_PROMPT, f"@{ctx_file}", message]

@@ -66,17 +66,20 @@ nginx/           reverse proxy behind Cloudflare Tunnel (self-signed TLS in dev)
 
 ## Model
 
-All three agents use Anthropic's Claude Haiku 4.5, chosen for simplicity: one provider, one model, one pricing entry.
-Pi (pi.dev) is not tied to a provider. Each agent can run a different model, including other cloud providers or local
-models (e.g. through Ollama or any OpenAI-compatible server): declare the provider and model in `agent/pi/models.json`,
-then set the agent's `MODEL` and `PROVIDER` (default `anthropic`) in `docker-compose.yml`. Local models cost nothing
-per token, so give them zero prices in `orchestrator/pricing.json`.
+All three agents use Anthropic's Claude Haiku 5.5 (`claude-haiku-5-5`, supported until at least October 7, 2027),
+chosen for simplicity: one provider, one model, one pricing entry. Pi (pi.dev) already knows it, so
+`agent/pi/models.json` declares nothing for it. `AGENT_THINKING` sets the thinking effort (`off` by default).
+
+Pi is not tied to a provider. Each agent can run a different model, including other cloud providers or local
+models (e.g. through Ollama or any OpenAI-compatible server): declare the provider and model in `agent/pi/models.json`
+if Pi does not include them, then set the agent's `MODEL` and `PROVIDER` (default `anthropic`) in `docker-compose.yml`.
+Local models cost nothing per token, so give them zero prices in `orchestrator/pricing.json`.
 
 > [!WARNING]
-> The three agents run on `claude-haiku-4-5-20251001`, **supported until October 15, 2026**.
-> After that date, agent runs will fail. To switch models, update all three together:
-> `agent/pi/models.json` (model declared to Pi), `orchestrator/pricing.json` (price per million tokens,
-> then set `verified` to `true`), and `MODEL_SCOUT` / `MODEL_CODER` / `MODEL_REVIEWER` in `.env`.
+> To switch models, update `MODEL_SCOUT` / `MODEL_CODER` / `MODEL_REVIEWER` in `.env` and add the model's price per
+> million tokens to `orchestrator/pricing.json` (then set `verified` to `true`). Without a price, the preflight fails
+> and runs are not counted against the budget. Do not redeclare a model Pi already includes in `agent/pi/models.json`:
+> the entry would replace Pi's own definition (thinking support, pricing tiers).
 
 ## Installation
 

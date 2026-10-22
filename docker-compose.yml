@@ -22,7 +22,7 @@ x-agent: &agent
 
 x-agent-env: &agent-env
   RUN_TIMEOUT_S: 300
-  THINKING: ${AGENT_THINKING:-off}      # off, low, medium, high
+  THINKING: ${AGENT_THINKING:-off}      # off, low, medium, high, xhigh, max
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
@@ -144,7 +144,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: scout
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_SCOUT:?}
-      MODEL: ${MODEL_SCOUT:-claude-haiku-4-5-20251001}
+      MODEL: ${MODEL_SCOUT:-claude-haiku-5-5}
       OTEL_SERVICE_NAME: agent-scout
     volumes:
       - ./prompts/scout.md:/app/prompt.md:ro
@@ -155,7 +155,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: coder
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_CODER:?}
-      MODEL: ${MODEL_CODER:-claude-haiku-4-5-20251001}
+      MODEL: ${MODEL_CODER:-claude-haiku-5-5}
       OTEL_SERVICE_NAME: agent-coder
     volumes:
       - ./prompts/coder.md:/app/prompt.md:ro
@@ -166,7 +166,7 @@ services:
       <<: *agent-env
       AGENT_ROLE: reviewer
       ANTHROPIC_API_KEY: ${ANTHROPIC_KEY_REVIEWER:?}
-      MODEL: ${MODEL_REVIEWER:-claude-haiku-4-5-20251001}
+      MODEL: ${MODEL_REVIEWER:-claude-haiku-5-5}
       OTEL_SERVICE_NAME: agent-reviewer
     volumes:
       - ./prompts/reviewer.md:/app/prompt.md:ro

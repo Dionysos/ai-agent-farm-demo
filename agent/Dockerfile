@@ -1,11 +1,12 @@
 # Service agent : HTTP server (Python, bibliothèque standard) autour du CLI Pi (Node).
 FROM node:22-slim
 
-ARG PI_VERSION=0.73.1
+# Pi >= 1.0 is published as @earendil-works/pi-coding-agent and requires Node.js >= 22.19
+ARG PI_VERSION=1.4.0
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
- && npm install -g @mariozechner/pi-coding-agent@${PI_VERSION} \
+ && npm install -g @earendil-works/pi-coding-agent@${PI_VERSION} \
  && npm cache clean --force
 
 # OpenTelemetry in venv
